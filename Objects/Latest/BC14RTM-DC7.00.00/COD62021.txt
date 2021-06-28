@@ -1,0 +1,103 @@
+OBJECT Codeunit 62021 DCADV Approval Flow Management
+{
+  OBJECT-PROPERTIES
+  {
+    Date=28.06.21;
+    Time=12:49:48;
+    Modified=Yes;
+    Version List=DCADV;
+  }
+  PROPERTIES
+  {
+    OnRun=BEGIN
+          END;
+
+  }
+  CODE
+  {
+    VAR
+      AdvAppvlMgt@1160040007 : Codeunit 6085746;
+      PurchDocMgt@1160040000 : Codeunit 6085709;
+      DiffBtwAsgnAndImpAmtMsg1@1160040002 : TextConst 'DEU=Es gibt einen Unterschied zwischen den importierten und den zugewiesenen BetrÑgen, wie unten gezeigt.\\ - Betrag exkl. MwSt. (Importiert): %5\ - Betrag exkl. MwSt. (Zugewiesen): %6\\;ENU=There is a difference between the imported amounts and the assigned amounts as shown below.\\ - Amount Excl. VAT (Imported): %5\ - Amount Excl. VAT (Assigned): %6\\';
+      DiffBtwAsgnAndImpAmtMsg2@1160040001 : TextConst 'DEU=" - MwSt. Betrag (Importiert): %3\ - MwSt. Betrag (Zugewiesen): %4\\ - Betrag Inkl. MwSt. (Importiert): %1\ - Betrag Inkl. MwSt. (Zugewiesen): %2";ENU=" - VAT Amount (Imported): %3\ - VAT Amount (Assigned): %4\\ - Amount Incl. VAT (Imported): %1\ - Amount Incl. VAT (Assigned): %2"';
+      SubmitForApprovalQst@1160040003 : TextConst 'DEU=\\Mîchten Sie das Dokument trotzdem zur Genehmigung einreichen?;ENU=\\Do you want to submit the document for approval anyway?';
+      ApprovalMgt@1160040004 : Codeunit 6085722;
+      DCApprovalsBridge@1160040006 : Codeunit 6085790;
+      Text038@1160040005 : TextConst 'DEU=Sie mÅssen %1 oder %2 angeben.;ENU=You must specify %1 or %2.';
+
+    [EventSubscriber(Table,6085767,OnBeforeIsApprovalFlowVisible,"",Skip,Skip)]
+    LOCAL PROCEDURE PurchHeaderInfo_OnBeforeIsApprovalFlowVisible@1160040001(VAR Handled@1160040000 : Boolean);
+    BEGIN
+      IF Handled THEN
+        EXIT;
+
+      IF (DCApprovalsBridge.IsAdvPurchInvApprEnabled AND IsDCPurchInvApprEnabled) OR
+         (DCApprovalsBridge.IsAdvPurchCrMemoApprEnabled AND IsDCPurchCrMemoApprEnabled) THEN
+        Handled := TRUE;
+    END;
+
+    [EventSubscriber(Table,6085767,OnBeforeUpdateApprvlFlowCode)]
+    LOCAL PROCEDURE PurchHeaderInfo_OnBeforeUpdateApprvlFlowCode@1160040000(PurchHeader@1160040000 : Record 38;NewCode@1160040001 : Code[10];VAR Handled@1160040002 : Boolean);
+    VAR
+      PurchHeaderDCInfo@1160040003 : Record 6085767;
+      ApprovalFlow@1160040004 : Record 6085725;
+    BEGIN
+      IF Handled THEN
+        EXIT;
+
+      Handled := TRUE;
+
+      PurchHeader.TESTFIELD(Status,PurchHeader.Status::Open);
+
+      IF NewCode = '' THEN BEGIN
+        IF PurchHeaderDCInfo.GET(PurchHeader."Document Type",PurchHeader."No.") THEN
+          PurchHeaderDCInfo.DELETE;
+        EXIT;
+      END;
+
+      // Verify that Approcal Flow Code and Advanced approval is not being used at the same time
+      {
+      CASE PurchHeader."Document Type" OF
+        PurchHeader."Document Type"::Invoice:
+          IF DCApprovalsBridge.IsAdvPurchInvApprEnabled THEN
+            ERROR(AppFlowAndAdvAppErr);
+        PurchHeader."Document Type"::"Credit Memo":
+          IF DCApprovalsBridge.IsAdvPurchCrMemoApprEnabled THEN
+            ERROR(AppFlowAndAdvAppErr);
+      END;
+      }
+
+      ApprovalFlow.GET(NewCode);
+      IF NOT PurchHeaderDCInfo.GET(PurchHeader."Document Type",PurchHeader."No.") THEN BEGIN
+        PurchHeaderDCInfo."Document Type" := PurchHeader."Document Type";
+        PurchHeaderDCInfo."No." := PurchHeader."No.";
+        PurchHeaderDCInfo.INSERT;
+      END;
+
+      PurchHeaderDCInfo."Approval Flow Code" := NewCode;
+      PurchHeaderDCInfo.MODIFY;
+    END;
+
+    PROCEDURE IsDCPurchInvApprEnabled@48() : Boolean;
+    VAR
+      Workflow@1000 : Record 1501;
+    BEGIN
+      Workflow.SETFILTER(Code,'DC-PIW*');
+      Workflow.SETRANGE(Enabled,TRUE);
+      EXIT(NOT Workflow.ISEMPTY);
+    END;
+
+    PROCEDURE IsDCPurchCrMemoApprEnabled@49() : Boolean;
+    VAR
+      Workflow@1000 : Record 1501;
+    BEGIN
+      Workflow.SETFILTER(Code,'DC-PCMW*');
+      Workflow.SETRANGE(Enabled,TRUE);
+      EXIT(NOT Workflow.ISEMPTY);
+    END;
+
+    BEGIN
+    END.
+  }
+}
+

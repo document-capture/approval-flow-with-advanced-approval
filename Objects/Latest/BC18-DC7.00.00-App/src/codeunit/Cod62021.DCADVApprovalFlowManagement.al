@@ -11,6 +11,7 @@ codeunit 62021 "DCADV Approval Flow Management"
         IF Handled THEN
             EXIT;
 
+        Handled := true;
         PurchHeader.TESTFIELD(Status, PurchHeader.Status::Open);
 
         IF NewCode = '' THEN BEGIN
@@ -38,7 +39,7 @@ codeunit 62021 "DCADV Approval Flow Management"
 
         PurchHeaderDCInfo."Approval Flow Code" := NewCode;
         PurchHeaderDCInfo.MODIFY;
-        Handled := true;
+
     end;
 
     [EventSubscriber(ObjectType::Table, 6085767, 'OnBeforeIsApprovalFlowVisible', '', true, true)]
@@ -48,21 +49,19 @@ codeunit 62021 "DCADV Approval Flow Management"
         ModuleLicense: Codeunit "CDC Module License";
         DCApprovalsBridge: Codeunit "CDC Approvals Bridge";
     begin
-        IF Handled THEN
+        if Handled then
             exit;
 
         if (IsAdvPurchInvApprEnabled and IsDCPurchInvApprEnabled) OR
-           (IsAdvPurchCrMemoApprEnabled and IsDCPurchCrMemoApprEnabled) then begin
+           (IsAdvPurchCrMemoApprEnabled and IsDCPurchCrMemoApprEnabled) then
             Handled := true;
-        end;
-
     end;
 
     local procedure IsDCPurchInvApprEnabled(): Boolean
     var
         Workflow: Record Workflow;
     begin
-        Workflow.SETFILTER(Code, 'DC-PI*');
+        Workflow.SETFILTER(Code, 'DC-PIW*');
         Workflow.SETRANGE(Enabled, TRUE);
         EXIT(NOT Workflow.ISEMPTY);
     end;
@@ -71,7 +70,7 @@ codeunit 62021 "DCADV Approval Flow Management"
     var
         Workflow: Record Workflow;
     begin
-        Workflow.SETFILTER(Code, 'DC-PC*');
+        Workflow.SETFILTER(Code, 'DC-PCMW*');
         Workflow.SETRANGE(Enabled, TRUE);
         EXIT(NOT Workflow.ISEMPTY);
     end;
